@@ -285,11 +285,9 @@ REACT_APP_API_BASE_URL=http://localhost:8080/api
 
 ---
 
-## License
 
-This project is created for educational purposes (B.Tech CSE Final Year Project).
 
 ---
 
-*Built with ❤️ using Java Spring Boot + React.js*
+
 
