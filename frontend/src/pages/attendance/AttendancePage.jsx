@@ -1,0 +1,17 @@
+import React, { useEffect, useState } from 'react';
+import attendanceService from '../../services/attendanceService';
+import employeeService from '../../services/employeeService';
+import { useAuth } from '../../context/AuthContext';
+
+export default function AttendancePage() {
+  const { currentUser } = useAuth();
+  const [rows, setRows] = useState([]); const [error, setError] = useState('');
+  const [employees, setEmployees] = useState([]); const [employeeId, setEmployeeId] = useState('');
+  const load = () => attendanceService.getAll().then(({ data }) => setRows(data.content || data)).catch(() => setError('Unable to load attendance.'));
+  useEffect(() => { if (currentUser?.role === 'EMPLOYEE') employeeService.getMe().then(({ data }) => { setEmployees([data]); setEmployeeId(String(data.id)); }).catch(() => setError('Your employee profile is not linked to this login.')); else employeeService.getAll().then(({ data }) => setEmployees(data.content || data)).catch(() => setError('Unable to load employees.')); load(); }, [currentUser]);
+  const checkIn = employeeId => attendanceService.checkIn({ employeeId }).then(load).catch(err => setError(err.response?.data?.message || 'Check-in failed.'));
+  const checkOut = employeeId => attendanceService.checkOut({ employeeId }).then(load).catch(err => setError(err.response?.data?.message || 'Check-out failed.'));
+  const today = new Date().toISOString().slice(0, 10);
+  const todaysAttendance = rows.find(row => row.employeeId === Number(employeeId) && row.attendanceDate === today);
+  return <div className="page-content"><h2 className="mb-4">Attendance</h2>{error && <div className="alert alert-danger">{error}</div>}<div className="table-card p-3 mb-4"><div className="row g-2 align-items-end"><div className="col-md-6"><label className="form-label">Employee</label><select className="form-select" value={employeeId} onChange={e => setEmployeeId(e.target.value)} disabled={currentUser?.role === 'EMPLOYEE'}><option value="">Select employee</option>{employees.map(employee => <option key={employee.id} value={employee.id}>{employee.employeeCode} - {employee.firstName} {employee.lastName}</option>)}</select></div><div className="col-auto"><button type="button" className="btn btn-success me-2" disabled={!employeeId || !!todaysAttendance?.checkInTime} onClick={() => checkIn(Number(employeeId))}>Check In</button><button type="button" className="btn btn-primary" disabled={!employeeId || !todaysAttendance?.checkInTime || !!todaysAttendance?.checkOutTime} onClick={() => checkOut(Number(employeeId))}>Check Out</button></div></div></div><div className="table-card p-3 table-responsive"><table className="table"><thead><tr><th>Employee</th><th>Date</th><th>Check in</th><th>Check out</th><th>Status</th><th /></tr></thead><tbody>{rows.filter(row => currentUser?.role !== 'EMPLOYEE' || row.employeeId === Number(employeeId)).map(r => <tr key={r.id}><td>{r.employee?.firstName ? `${r.employee.firstName} ${r.employee.lastName}` : r.employeeId}</td><td>{r.attendanceDate}</td><td>{r.checkInTime || '-'}</td><td>{r.checkOutTime || '-'}</td><td>{r.status}</td><td><button className="btn btn-sm btn-outline-success me-1" disabled={!!r.checkInTime} onClick={() => checkIn(r.employeeId)}>Check in</button><button className="btn btn-sm btn-outline-primary" disabled={!r.checkInTime || !!r.checkOutTime} onClick={() => checkOut(r.employeeId)}>Check out</button></td></tr>)}</tbody></table></div></div>;
+}

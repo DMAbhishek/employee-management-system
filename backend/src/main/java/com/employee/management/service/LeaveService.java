@@ -1,0 +1,11 @@
+package com.employee.management.service;
+import com.employee.management.dto.LeaveRequestDto; import com.employee.management.entity.*; import com.employee.management.repository.*; import org.springframework.stereotype.Service; import org.springframework.transaction.annotation.Transactional; import java.time.*; import java.util.*;
+@Service public class LeaveService {
+ private final LeaveRequestRepository repo; private final EmployeeRepository employees; private final UserRepository users;
+ public LeaveService(LeaveRequestRepository r,EmployeeRepository e,UserRepository u){repo=r;employees=e;users=u;}
+ @Transactional public LeaveRequest create(LeaveRequestDto d){if(d.startDate().isAfter(d.endDate()))throw new IllegalArgumentException("Invalid leave dates");LeaveRequest l=new LeaveRequest();l.setEmployee(employees.findById(d.employeeId()).orElseThrow());l.setLeaveType(LeaveRequest.LeaveType.valueOf(d.leaveType()));l.setStartDate(d.startDate());l.setEndDate(d.endDate());l.setTotalDays((int)(d.endDate().toEpochDay()-d.startDate().toEpochDay()+1));l.setReason(d.reason());return repo.save(l);}
+ public List<LeaveRequest> all(Long employeeId){return employeeId==null?repo.findAllByOrderByAppliedAtDesc():repo.findByEmployee_IdOrderByAppliedAtDesc(employeeId);}
+ public List<LeaveRequest> allForUser(String username){return employees.findByUser_Username(username).map(employee -> all(employee.getId())).orElseThrow(() -> new NoSuchElementException("Employee profile is not linked to this login"));}
+ @Transactional public LeaveRequest createForUser(LeaveRequestDto d,String username){Long employeeId=employees.findByUser_Username(username).orElseThrow(() -> new NoSuchElementException("Employee profile is not linked to this login")).getId();return create(new LeaveRequestDto(employeeId,d.leaveType(),d.startDate(),d.endDate(),d.reason(),d.reviewRemarks()));}
+ @Transactional public LeaveRequest review(Long id,boolean approve,String remarks,String username){LeaveRequest l=repo.findById(id).orElseThrow();if(l.getStatus()!=LeaveRequest.Status.PENDING)throw new IllegalStateException("Leave already reviewed");l.setStatus(approve?LeaveRequest.Status.APPROVED:LeaveRequest.Status.REJECTED);l.setReviewRemarks(remarks);l.setReviewedAt(LocalDateTime.now());users.findByUsername(username).ifPresent(l::setReviewedBy);return repo.save(l);}
+}
